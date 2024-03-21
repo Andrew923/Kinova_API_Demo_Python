@@ -2,26 +2,28 @@ import sys
 # For image processing
 import numpy as np
 import cv2
-from connect import RobotAPI
+from connect import RobotConnect
 from scipy.spatial.transform import Rotation
+from kortex_api.autogen.messages import VisionConfig_pb2
+
 class BallDetector:
     """
     This class uses the arm's camera to find a green ball and then calculate its center coordinates in the global frame
     """
-    def __init__(self, robot_api: RobotAPI):
+    def __init__(self, robot_connection: RobotConnect):
         """
-        :param robot_api: object that has established a connection to the arm
+        :param robot_connection: object that has established a connection to the arm
         """
         # Save the current attached api
-        self.robot_api = robot_api
+        self.robot_connection = robot_connection
 
         # You don't need a connection to access the stream itself, just the ip
-        self.camera_stream = f"rtsp://{self.robot_api.ip}/color"
+        self.camera_stream = f"rtsp://{self.robot_connection.ip}/color"
         # Video capture with opencv so you can process the images
         self.video_capture = cv2.VideoCapture(self.camera_stream)
 
         # You need the matrix to calculate point distance
-        intrinsics = self.robot_api.get_intrinsic_vision_parameters()
+        intrinsics = self.get_intrinsic_vision_parameters()
         self.intrinsic_matrix = np.array([
             [intrinsics.focal_length_x, 0, intrinsics.principal_point_x],
             [0, intrinsics.focal_length_y, intrinsics.principal_point_y],
@@ -53,13 +55,26 @@ class BallDetector:
         self.ball_height = 0.05
         self.kinova_support = 0.02  # height of black base under the arm
 
+        # Store the position of the ball in the global frame
+        self.global_point = None
 
+    def get_intrinsic_vision_parameters(self):
+        """
+        Using the established connection, obtain the intrinsic parameters of the camera device
+        This is needed for transforming the 2D info about the image into a 3D point
+        :return: intrinsic parameters of the camera on the arm
+        """
+        sensor_id = VisionConfig_pb2.SensorIdentifier() # Message for communication
+        sensor_id.sensor = VisionConfig_pb2.SENSOR_COLOR # Specify that you want the vision (and not depth)
+        intrinsics = self.robot_connection.vision_config.GetIntrinsicParameters(sensor_id, self.robot_connection.vision_device_id)
+        return intrinsics
 
     def find_object(self, display_view: bool = True):
         """
         This function will look for a green ball in the camera video stream
+        Saves position of the ball center w.r.t global frame as an object attribute
+
         :param display_view: Whether opencv should show a screen with the tracked ball
-        :return: Position of the ball center w.r.t global frame
         """
         try:
             # Get the current frame from the video (there might be a tiny delay)
@@ -108,10 +123,10 @@ class BallDetector:
                         1
                     ])
 
-                    # Get the transformation from the base to the tool and from that compute base to camera
-                    # I don't know how to get base to camera directly with the API...
+                    # Get the transformation from the base to the tool. From that, compute base to camera
+                    # I don't know how to get base to camera directly with the API... think it is not possible
 
-                    base_to_tool = self.robot_api.base.GetMeasuredCartesianPose()
+                    base_to_tool = self.robot_connection.base.GetMeasuredCartesianPose() # This gets the pose of the tool wrt to base
                     base_to_tool_translation = np.array([base_to_tool.x, base_to_tool.y, base_to_tool.z])
                     base_to_tool_rotation = Rotation.from_euler('ZYX',
                                                                 np.array([base_to_tool.theta_z, base_to_tool.theta_y, base_to_tool.theta_x])*np.pi/180)
@@ -127,11 +142,9 @@ class BallDetector:
                     # Get the point in the camera frame
                     cam_point = cam_z * pc0
                     # Convert to global
-                    global_point = base_to_camera_rotation @ cam_point + base_to_camera_translation
-                    return global_point
-
+                    self.global_point = base_to_camera_rotation @ cam_point + base_to_camera_translation
         except:
-            print('An error has occurred')
+            print('An error has occurred, restarting detection')
 
     def end_vision(self):
         """
@@ -140,4 +153,3 @@ class BallDetector:
         """
         self.video_capture.release()
         cv2.destroyAllWindows()
-

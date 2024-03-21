@@ -1,24 +1,25 @@
 """
 This file creates a connection to the arm and sets up configurations for the programs to work
 Made for high-level control
-Please consult canvas course and Kinova documentation for other modes
 """
 # You need these modules to connect to the robot
+# Establish connection
 from kortex_api.TCPTransport import TCPTransport
 from kortex_api.RouterClient import RouterClient
 from kortex_api.SessionManager import SessionManager
-from kortex_api.autogen.messages import DeviceConfig_pb2, Session_pb2, VisionConfig_pb2
-from kortex_api.autogen.client_stubs.DeviceConfigClientRpc import DeviceConfigClient
+# Messages to connect to the robot
+from kortex_api.autogen.messages import DeviceConfig_pb2, Session_pb2
+# Clients to accessed devices/services
 from kortex_api.autogen.client_stubs.DeviceManagerClientRpc import DeviceManagerClient
 from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.VisionConfigClientRpc import VisionConfigClient
 
-class RobotAPI:
+class RobotConnect:
     def __init__(self, ip, port, credentials):
         """
         :param ip: IP Address of the robot
-        :param port: TCP port (default 10000)
-        :param credentials: (login, password). Don't use admin in your applications
+        :param port: TCP port (default should be 10000)
+        :param credentials: (login, password). Don't use admin/admin in your applications
         """
         # Hyperparameters
         self.ip = ip
@@ -29,7 +30,6 @@ class RobotAPI:
         self.transport = None # TCP layer connection
         self.router = None # Router to arm's devices
         self.session_manager = None # Establish a session with uname/password
-        self.device_config = None # Get/set parameters for the devices
         self.device_manager = None # Information on connected devices
         self.base = None # Send commands and get feedback from the robot
 
@@ -43,11 +43,10 @@ class RobotAPI:
         It is easier to use the DeviceConnection utility class to create the router and then
         create the services you need (as done in the other examples).
         """
-
         # Set up API
         self.transport = TCPTransport() # TCP is to be used for high-level comms
-        self.router = RouterClient(self.transport) # Router allows you to interact with elements other than base
-        self.transport.connect(self.ip, self.port) # TCP Connect is required for high-level servoing
+        self.transport.connect(self.ip, self.port)  # TCP Connect is required for high-level servoing
+        self.router = RouterClient(self.transport) # Router allows you to interact with devices
 
         # Create session
         # Anytime you want to use the robot, you need to create a session. This will use your credentials
@@ -64,30 +63,18 @@ class RobotAPI:
         self.session_manager.CreateSession(session_info)
         print("Session created")
 
-        # Create required services
-        self.device_config = DeviceConfigClient(self.router)
+        # Create required service interfaces
         self.device_manager = DeviceManagerClient(self.router)
         self.base = BaseClient(self.router)
 
         # Specifically save the vision device, as it is going to be used for the tracking
-        # This assumes your arm has vision
-        self.vision_config = VisionConfigClient(self.router)  # Using a router that was previously established for the robot
+        self.vision_config = VisionConfigClient(self.router)
 
         # Identify the id of the vision device
         all_devices_info = self.device_manager.ReadAllDevices()
         vision_handles = [hd for hd in all_devices_info.device_handle if hd.device_type == DeviceConfig_pb2.VISION]
         handle = vision_handles[0]
         self.vision_device_id = handle.device_identifier  # Save id to object properties
-
-    def get_intrinsic_vision_parameters(self):
-        """
-        Using the established connection, obtain the intrinsic parameters of the camera device
-        :return: intrinsic parameters of the camera on the arm
-        """
-        sensor_id = VisionConfig_pb2.SensorIdentifier() # Message for communication
-        sensor_id.sensor = VisionConfig_pb2.SENSOR_COLOR # Specify that you want the vision (and not depth)
-        intrinsics = self.vision_config.GetIntrinsicParameters(sensor_id, self.vision_device_id)
-        return intrinsics
 
     def close_connection(self):
         """
@@ -103,9 +90,9 @@ class RobotAPI:
 
 if __name__ == "__main__":
     # For debugging
-    ip = "192.168.2.10" # TODO: Change to arm IP
+    ip = "192.168.2.10" # TODO: Change to arm IP if not the same
     port = 10000 # Default TCP Port
     credentials = ("admin", "admin") # TODO: Change this in your application
-    apiObject = RobotAPI(ip, port, credentials)
+    apiObject = RobotConnect(ip, port, credentials)
     apiObject.create_connection()
     apiObject.close_connection()
