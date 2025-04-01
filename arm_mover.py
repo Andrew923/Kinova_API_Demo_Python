@@ -12,8 +12,8 @@ class ArmMover:
         self.robot_connection = robot_connection
         
         # Velocity control parameters
-        self.linear_velocity = 100  # m/s
-        self.angular_velocity = 35.0  # deg/s
+        self.linear_velocity = 1  # m/s
+        self.angular_velocity = 30.0  # deg/s
         self.gripper_speed = 0.4
         
         # Current commands (initialize all to zero)
@@ -39,13 +39,13 @@ class ArmMover:
             try:
                 # Only send commands that have changed
                 if self.twist_dirty:
-                    print(self.current_twist)
-                    # self.robot_connection.base.SendTwistCommand(self.current_twist)
+                    # print(self.current_twist)
+                    self.robot_connection.base.SendTwistCommand(self.current_twist)
                     self.twist_dirty = False
                 
                 if self.joint_speeds_dirty:
-                    print(self.current_joint_speeds)
-                    # self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
+                    # print(self.current_joint_speeds)
+                    self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
                     self.joint_speeds_dirty = False
                 
                 if self.gripper_dirty:
