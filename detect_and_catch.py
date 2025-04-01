@@ -10,7 +10,7 @@ import cv2
 # Parameters
 ip = "192.168.2.10"
 port = 10000 # Default TCP port
-credentials = ("admin", "admin") # TODO: Change to your own username-password
+credentials = ("acyu", "kinova") # TODO: Change to your own username-password
 
 # Start connection
 robot_connection = RobotConnect(ip, port, credentials)

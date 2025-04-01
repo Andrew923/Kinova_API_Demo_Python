@@ -1,190 +1,166 @@
 """
-This class commands the robot to go to some position and catch an object
+Enhanced ArmMover with dirty flag system for efficient command sending
 """
-import numpy as np
 
-from connect import RobotConnect
-from kortex_api.autogen.messages import Base_pb2
+import numpy as np
 import threading
 import time
+from kortex_api.autogen.messages import Base_pb2, Common_pb2
 
 class ArmMover:
-    def __init__(self, robot_connection: RobotConnect):
-        # Link this object to an existing robot connection
+    def __init__(self, robot_connection):
         self.robot_connection = robot_connection
+        
+        # Velocity control parameters
+        self.linear_velocity = 100  # m/s
+        self.angular_velocity = 35.0  # deg/s
+        self.gripper_speed = 0.4
+        
+        # Current commands (initialize all to zero)
+        self.current_twist = Base_pb2.TwistCommand()
+        self.current_twist.reference_frame = Common_pb2.CARTESIAN_REFERENCE_FRAME_BASE
+        
+        self.current_joint_speeds = Base_pb2.JointSpeeds()
+        self.current_gripper_speed = 0.0
+        
+        # Dirty flags
+        self.twist_dirty = False
+        self.joint_speeds_dirty = False
+        self.gripper_dirty = False
+        
+        # Thread control
+        self.running = True
+        self.command_thread = threading.Thread(target=self._send_continuous_commands)
+        self.command_thread.start()
 
-        # Movement parameters
-        self.TIMEOUT_DURATION = 20 # Timeout for action
-        self.gripper_timeout = 5 # Timeout for gripper actions
+    def _send_continuous_commands(self):
+        """Thread that efficiently sends only changed commands"""
+        while self.running:
+            try:
+                # Only send commands that have changed
+                if self.twist_dirty:
+                    print(self.current_twist)
+                    # self.robot_connection.base.SendTwistCommand(self.current_twist)
+                    self.twist_dirty = False
+                
+                if self.joint_speeds_dirty:
+                    print(self.current_joint_speeds)
+                    # self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
+                    self.joint_speeds_dirty = False
+                
+                if self.gripper_dirty:
+                    gripper_command = Base_pb2.GripperCommand()
+                    finger = gripper_command.gripper.finger.add()
+                    gripper_command.mode = Base_pb2.GRIPPER_SPEED
+                    finger.value = self.current_gripper_speed
+                    self.robot_connection.base.SendGripperCommand(gripper_command)
+                    self.gripper_dirty = False
+                
+                time.sleep(0.02)  # 50Hz command rate
+                
+            except Exception as e:
+                print(f"Error sending commands: {e}")
+                if not self.running:  # If we're shutting down, break the loop
+                    break
+                time.sleep(0.1)  # Brief pause before retrying
 
-        # Position where the arm can see the table and track the target
-        # This is hardcoded because this was the position that maximized precision in catching
-        self.track_action = Base_pb2.Action()
-        self.track_action.name = "Position to track the target"
-        self.track_action.application_data = ""
-        # Set the tracking pose
-        cartesian_pose = self.track_action.reach_pose.target_pose # Pass by reference
-        # Hardcoded
-        cartesian_pose.x = 0.38 # (meters)
-        cartesian_pose.y = 0.00  # (meters)
-        cartesian_pose.z = 0.34  # (meters)
-        cartesian_pose.theta_x = 180  # (degrees)
-        cartesian_pose.theta_y = 0  # (degrees)
-        cartesian_pose.theta_z = 90  # (degrees)
+    def stop(self):
+        """Stop all movement and clean up"""
+        self.running = False
+        
+        # Set all commands to zero and mark dirty
+        self.set_cartesian_velocity()
+        self.set_joint_velocities([0]*6)  # Assuming 6DOF arm
+        self.move_gripper(0)
+        
+        # Wait for thread to finish
+        self.command_thread.join()
+        
+        # Send final stop command
+        self.robot_connection.base.Stop()
+        
+    def set_cartesian_velocity(self, linear_x=0, linear_y=0, linear_z=0,
+                            angular_x=0, angular_y=0, angular_z=0):
+        """Set cartesian velocity command and mark as dirty"""
+        new_linear_x = linear_x * self.linear_velocity
+        new_linear_y = linear_y * self.linear_velocity
+        new_linear_z = linear_z * self.linear_velocity
+        new_angular_x = angular_x * self.angular_velocity
+        new_angular_y = angular_y * self.angular_velocity
+        new_angular_z = angular_z * self.angular_velocity
+        
+        # Only update and mark dirty if values actually changed
+        if (self.current_twist.twist.linear_x != new_linear_x or
+            self.current_twist.twist.linear_y != new_linear_y or
+            self.current_twist.twist.linear_z != new_linear_z or
+            self.current_twist.twist.angular_x != new_angular_x or
+            self.current_twist.twist.angular_y != new_angular_y or
+            self.current_twist.twist.angular_z != new_angular_z):
+            
+            self.current_twist.twist.linear_x = new_linear_x
+            self.current_twist.twist.linear_y = new_linear_y
+            self.current_twist.twist.linear_z = new_linear_z
+            self.current_twist.twist.angular_x = new_angular_x
+            self.current_twist.twist.angular_y = new_angular_y
+            self.current_twist.twist.angular_z = new_angular_z
+            self.twist_dirty = True
 
+    def set_joint_velocities(self, joint_velocities):
+        """Set joint velocity command and mark as dirty"""
+        # Create new JointSpeeds message
+        new_joint_speeds = Base_pb2.JointSpeeds()
+        for i, vel in enumerate(joint_velocities):
+            js = new_joint_speeds.joint_speeds.add()
+            js.joint_identifier = i
+            js.value = vel
+            js.duration = 0
+        
+        # Only update if the new command is different
+        if ((len(self.current_joint_speeds.joint_speeds) != len(new_joint_speeds.joint_speeds))
+             or any(old.value != new.value for old, new in 
+                zip(self.current_joint_speeds.joint_speeds, new_joint_speeds.joint_speeds))):
+            
+            self.current_joint_speeds = new_joint_speeds
+            self.joint_speeds_dirty = True
 
-    def _check_for_end_or_abort(self, e):
-        """Return a closure checking for END or ABORT notifications
-        Arguments:
-        e -- event to signal when the action is completed
-            (will be set when an END or ABORT occurs)
-        """
-        def check(notification, e=e):
-            print("EVENT : " + \
-                  Base_pb2.ActionEvent.Name(notification.action_event))
-            if notification.action_event == Base_pb2.ACTION_END \
-                    or notification.action_event == Base_pb2.ACTION_ABORT:
-                e.set()
+    def move_gripper(self, direction):
+        """Move gripper at constant speed and mark as dirty"""
+        new_speed = direction * self.gripper_speed
+        if self.current_gripper_speed != new_speed:
+            self.current_gripper_speed = new_speed
+            self.gripper_dirty = True
 
-        return check
+    def stop_gripper(self):
+        """Stop gripper movement"""
+        self.current_gripper_speed = 0.0
 
-    def _execute_movement(self, action: Base_pb2.Action):
-        """
-        This is the function that actually executes the movement
-        """
-        # threading is necessary for us to check the status WHILE the robot goes to a position
+    def object_tracking_position(self):
+        """Move to predefined tracking position (using position control)"""
+        track_action = Base_pb2.Action()
+        track_action.name = "Position to track the target"
+        cartesian_pose = track_action.reach_pose.target_pose
+        cartesian_pose.x = 0.38
+        cartesian_pose.y = 0.00
+        cartesian_pose.z = 0.34
+        cartesian_pose.theta_x = 180
+        cartesian_pose.theta_y = 0
+        cartesian_pose.theta_z = 90
+        return self._execute_movement(track_action)
+
+    def _execute_movement(self, action):
+        """Execute a position-based movement (for initial positioning)"""
         e = threading.Event()
         notification_handle = self.robot_connection.base.OnNotificationActionTopic(
             self._check_for_end_or_abort(e),
             Base_pb2.NotificationOptions()
         )
-
-        print("Executing action")
-        self.robot_connection.base.ExecuteAction(action) # Send the desired action to the robot
-
-        print("Waiting for movement to finish ...")
-        finished = e.wait(self.TIMEOUT_DURATION)
+        self.robot_connection.base.ExecuteAction(action)
+        finished = e.wait(20)
         self.robot_connection.base.Unsubscribe(notification_handle)
+        return finished
 
-        if finished:
-            print("Cartesian movement completed")
-        else:
-            print("Timeout on action notification wait")
-        return finished # Returns if the action was successful before the timeout
-
-
-    def object_tracking_position(self):
-        """
-        Move the arm to the pre-defined tracking position to maximize catching precision
-        :return: if the operation was successful
-        """
-        print("Moving to tracking position ...")
-        # The position has already been defined
-        track_success = self._execute_movement(self.track_action)
-        return track_success
-
-    def catch_target(self, point: np.ndarray):
-        """
-        From the 3D point estimated by the vision module, move to the ball's position
-        :param point: 3D numpy array
-        :return: boolean if the operation was successful
-        """
-        # Open the gripper
-        self.move_gripper(0)
-
-        # Save the x and y position of the ball
-        target_x = point[0]
-        target_y = point[1]
-
-        # Move to the object's vertical
-        prime = Base_pb2.Action()
-        prime.name = "Primed for target"
-        prime.application_data = ""
-        # Set the tracking pose
-        cartesian_pose = prime.reach_pose.target_pose  # Pass by reference
-        # Hardcoded
-        cartesian_pose.x = target_x  # (meters)
-        cartesian_pose.y = target_y  # (meters)
-        cartesian_pose.z = 0.2  # (meters)
-        cartesian_pose.theta_x = 180  # (degrees)
-        cartesian_pose.theta_y = 0  # (degrees)
-        cartesian_pose.theta_z = 90  # (degrees)
-
-        success = self._execute_movement(prime)
-
-        # If the arm has reached the target's vertical, go to target position
-        if success:
-            goto = Base_pb2.Action()
-            goto.name = "Go to target"
-            goto.application_data = ""
-            # Set the tracking pose
-            cartesian_pose = goto.reach_pose.target_pose  # Pass by reference
-            # Hardcoded
-            cartesian_pose.x = target_x  # (meters)
-            cartesian_pose.y = target_y  # (meters)
-            cartesian_pose.z = 0.02  # (meters)
-            cartesian_pose.theta_x = 180  # (degrees)
-            cartesian_pose.theta_y = 0  # (degrees)
-            cartesian_pose.theta_z = 90  # (degrees)
-            success = self._execute_movement(goto)
-
-        # Grasp the ball
-        if success:
-            success = self.move_gripper(0.3)
-
-        # Lift the ball
-        if success:
-            success = self._execute_movement(prime)
-
-        # Open the gripper
-        if success:
-            self.move_gripper(0.05)
-
-    def move_gripper(self, value):
-        """
-        Open or close the gripper
-        :param value: value in [0, 1]. 0 for open, 1 for closed.
-        :return: If operation was successful
-        """
-        gripper_command = Base_pb2.GripperCommand()
-        finger = gripper_command.gripper.finger.add()
-        # Set speed to open gripper
-        print("Setting gripper position using velocity command...")
-        gripper_command.mode = Base_pb2.GRIPPER_SPEED
-
-
-        # Create message that will allow us to get feedback on gripper status
-        gripper_request = Base_pb2.GripperRequest()
-        gripper_request.mode = Base_pb2.GRIPPER_POSITION
-        gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(gripper_request)
-        current_value = gripper_measure.finger[0].value
-        # Set velocity value depending on its sense (positive to open, negative to close. Yes, funny convention)
-        # Close command
-        if value > current_value:
-            finger.value = -0.1
-            self.robot_connection.base.SendGripperCommand(gripper_command)
-            start = time.time()
-            current_time = time.time()
-            while current_time - start < self.gripper_timeout:
-                gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(gripper_request)
-                current_value = gripper_measure.finger[0].value
-                if current_value >= value:
-                    return True
-                current_time = time.time()
-            return False
-        # Open command
-        if value < current_value:
-            finger.value = 0.1
-            self.robot_connection.base.SendGripperCommand(gripper_command)
-            start = time.time()
-            current_time = time.time()
-            while current_time - start < self.gripper_timeout:
-                gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(gripper_request)
-                current_value = gripper_measure.finger[0].value
-                if current_value <= value:
-                    return True
-                current_time = time.time()
-            return False
-
-
-
+    def _check_for_end_or_abort(self, e):
+        def check(notification, e=e):
+            if notification.action_event in [Base_pb2.ACTION_END, Base_pb2.ACTION_ABORT]:
+                e.set()
+        return check
