@@ -20,8 +20,8 @@ class MouseController:
         # Control parameters
         self.max_linear_speed = 1
         self.max_angular_speed = 1
-        self.scroll_sensitivity = 1
-        self.angular_scroll_sensitivity = 1.0  # deg per scroll step
+        self.scroll_sensitivity = 0.5
+        self.angular_scroll_sensitivity = 1
         self.gripper_speed = 1
         
         # Control state
@@ -120,7 +120,6 @@ class MouseController:
                     linear_y=vy,
                     linear_z=vz
                 )
-                self.linear_scroll_value = 0  # Reset after apply
                 
                 # Show Z-axis status
                 text = self.font.render(f"Z-translate: {vz:.2f} m/s", True, (0, 0, 0))
@@ -142,13 +141,13 @@ class MouseController:
                     angular_y=rx,  # Roll
                     angular_z=angular_z  # Yaw from scroll
                 )
-                self.angular_scroll_value = 0  # Reset after apply
                 
                 # Show rotation status
                 text = self.font.render(f"Z-rotate: {angular_z:.1f}°/s", True, (0, 0, 0))
                 self.screen.blit(text, (10, 40))
             else:
-                # Stop all movement when not dragging
+                self.linear_scroll_value = 0
+                self.angular_scroll_value = 0
                 self.mover.set_cartesian_velocity()
             
             # Draw help text
