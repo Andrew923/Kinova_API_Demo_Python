@@ -20,7 +20,7 @@ import give_base_get_info as base_calc
 from data_collector import DataCollector
 
 class RobotConnect:
-    def __init__(self, ip, port, credentials, debug=False):
+    def __init__(self, ip, port, credentials, debug=True):
         """
         :param ip: IP Address of the robot
         :param port: TCP port (default should be 10000)
@@ -49,6 +49,7 @@ class RobotConnect:
         self.vision_device_id = None # Saving the id of the vision object saves time when getting its parameters
 
     def push_current_info(self, gripper_info):
+        if self.debug: return
         # using the established connection, print the current position info
         # Parameter for info (using BaseCyclicClient)
         # print("FORWARD KINEMATICS EXAMPLE!!")

@@ -1,18 +1,20 @@
 import pygame
 pygame.init()
-joysticks = []
 clock = pygame.time.Clock()
 keepPlaying = True
 
-# for al the connected joysticks
-for i in range(0, pygame.joystick.get_count()):
-    # create an Joystick object in our list
-    joysticks.append(pygame.joystick.Joystick(i))
-    # initialize the appended joystick (-1 means last array item)
-    joysticks[-1].init()
-    # print a statement telling what the name of the controller is
-    print ("Detected joystick "),joysticks[-1].get_name(),"'"
+if pygame.joystick.get_count() > 0:
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
+    print(f"Controller connected: {joystick.get_name()}")
+else:
+    print("No controller found!")
 while keepPlaying:
-    clock.tick(60)
-    for event in pygame.event.get():
-        print(event)
+    pygame.event.pump()  # Process event queue
+            
+    # Get all axis values (adjust indices based on your controller)
+    axes = [joystick.get_axis(i) for i in range(joystick.get_numaxes())]
+    buttons = [joystick.get_button(i) for i in range(joystick.get_numbuttons())]
+    print("Axes:", axes)
+    print("Buttons:", buttons)
+    clock.tick(1)

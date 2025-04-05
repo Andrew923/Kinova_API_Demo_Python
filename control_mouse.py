@@ -4,7 +4,6 @@ Drag-based MouseController with fixed coordinates and full rotation control
 
 import pygame
 import math
-import threading
 from connect import RobotConnect
 from arm_mover import ArmMover
 
@@ -49,7 +48,7 @@ class MouseController:
         return (direction[0] * speed, direction[1] * speed)
 
     def control_loop(self):
-        """Main control thread"""
+        """Main control loop"""
         clock = pygame.time.Clock()
         
         while self.running:
@@ -110,10 +109,11 @@ class MouseController:
                 vx, vy = self._calculate_velocity(
                     self.drag_start_pos, self.current_drag_pos, self.max_linear_speed
                 )
+                vz = self.linear_scroll_value  # Capture before reset
                 self.mover.set_cartesian_velocity(
                     linear_x=vx,
                     linear_y=vy,
-                    linear_z=self.linear_scroll_value
+                    linear_z=vz
                 )
                 self.linear_scroll_value = 0  # Reset after apply
                 
@@ -131,15 +131,16 @@ class MouseController:
                 rx, ry = self._calculate_velocity(
                     self.drag_start_pos, self.current_drag_pos, self.max_angular_speed
                 )
+                angular_z = self.angular_scroll_value  # Capture before reset
                 self.mover.set_cartesian_velocity(
                     angular_x=ry,  # Pitch
                     angular_y=rx,  # Roll
-                    angular_z=self.angular_scroll_value  # Yaw from scroll
+                    angular_z=angular_z  # Yaw from scroll
                 )
                 self.angular_scroll_value = 0  # Reset after apply
                 
                 # Show rotation status
-                text = self.font.render(f"Z-rotate: {self.angular_scroll_value:.1f}°/s", True, (0, 0, 0))
+                text = self.font.render(f"Z-rotate: {angular_z:.1f}°/s", True, (0, 0, 0))
                 self.screen.blit(text, (10, 40))
             
             # Draw help text
@@ -162,18 +163,10 @@ class MouseController:
         print("- Left-drag: X/Y translation + scroll for Z")
         print("- Right-drag: X/Y rotation + scroll for Z-rotation")
         
-        control_thread = threading.Thread(target=self.control_loop)
-        control_thread.start()
+        self.control_loop()  # Run in main thread
         
-        try:
-            while self.running:
-                pygame.time.wait(100)
-        except KeyboardInterrupt:
-            self.running = False
-        finally:
-            control_thread.join()
-            pygame.quit()
-            self.mover.stop()
+        pygame.quit()
+        self.mover.stop()
 
 if __name__ == "__main__":
     rc = RobotConnect("192.168.2.10", 10000, ("acyu", "kinova"))

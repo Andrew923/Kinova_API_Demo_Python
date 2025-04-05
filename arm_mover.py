@@ -14,7 +14,10 @@ class ArmMover:
         # Gripper info
         self.gripper_request = Base_pb2.GripperRequest()
         self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
-        self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
+        if not self.robot_connection.debug:
+            self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
+        else:
+            self.gripper_measure = None
         
         # Velocity control parameters
         self.linear_velocity = 1  # m/s
@@ -47,13 +50,17 @@ class ArmMover:
             try:
                 # Only send commands that have changed
                 if self.twist_dirty:
-                    print(self.current_twist)
-                    # self.robot_connection.base.SendTwistCommand(self.current_twist)
+                    if not self.robot_connection.debug:
+                        self.robot_connection.base.SendTwistCommand(self.current_twist)
+                    else:
+                        print(self.current_twist)
                     self.twist_dirty = False
                 
                 if self.joint_speeds_dirty:
-                    print(self.current_joint_speeds)
-                    # self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
+                    if not self.robot_connection.debug:
+                        self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
+                    else:
+                        print(self.current_joint_speeds)
                     self.joint_speeds_dirty = False
                 
                 if self.gripper_dirty:
@@ -62,12 +69,14 @@ class ArmMover:
                     gripper_command.mode = Base_pb2.GRIPPER_SPEED
                     finger.value = self.current_gripper_speed
 
-                    self.gripper_request = Base_pb2.GripperRequest()
-                    self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
-                    self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
+                    if not self.robot_connection.debug:
+                        self.gripper_request = Base_pb2.GripperRequest()
+                        self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
+                        self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
 
-                    print(gripper_command)
-                    # self.robot_connection.base.SendGripperCommand(gripper_command)
+                        self.robot_connection.base.SendGripperCommand(gripper_command)
+                    else:
+                        print(gripper_command)
                     self.gripper_dirty = False
                 
                 time.sleep(0.02)  # 50Hz command rate
@@ -95,6 +104,8 @@ class ArmMover:
         
     def set_cartesian_velocity(self, linear_x=0, linear_y=0, linear_z=0,
                             angular_x=0, angular_y=0, angular_z=0):
+        print(f"Setting cartesian velocity: {linear_x}, {linear_y}, {linear_z}, "
+              f"{angular_x}, {angular_y}, {angular_z}")
         """Set cartesian velocity command and mark as dirty"""
         new_linear_x = linear_x * self.linear_velocity
         new_linear_y = linear_y * self.linear_velocity
@@ -163,6 +174,9 @@ class ArmMover:
 
     def _execute_movement(self, action):
         """Execute a position-based movement (for initial positioning)"""
+        if self.robot_connection.debug:
+            print(action)
+            return True
         e = threading.Event()
         notification_handle = self.robot_connection.base.OnNotificationActionTopic(
             self._check_for_end_or_abort(e),
