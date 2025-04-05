@@ -1,15 +1,17 @@
 """
-Keyboard control for Kinova robotic arm with improved key mapping
+Keyboard control for Kinova robotic arm with improved key mapping using Pygame
 Spacebar toggles between linear/angular velocity modes
 Arrow keys control gripper
 """
 
 import sys
-import time
-import threading
-from sshkeyboard import listen_keyboard
+import pygame
+from pygame.locals import *
 from connect import RobotConnect
 from arm_mover import ArmMover
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"  # For headless operation
+os.environ["SDL_AUDIODRIVER"] = "dummy"  # Disable audio subsystem
 
 class KeyboardController:
     def __init__(self, robot_connection):
@@ -36,7 +38,6 @@ class KeyboardController:
                 print(f"Switched to {self.velocity_mode} velocity mode")
             elif key == 'esc':
                 self.running = False
-                return False  # Stop listener
             elif key == 'r':
                 self.mover.object_tracking_position()
             elif key in ['up', 'down']:
@@ -101,15 +102,41 @@ class KeyboardController:
         # Move to initial position
         self.mover.object_tracking_position()
         
-        # Start keyboard listener
-        listen_keyboard(
-            on_press=self.on_press,
-            on_release=self.on_release,
-            until='esc',
-            delay_other_chars=0.1,
-        )
-        
-        # Clean up
+        # Initialize Pygame
+        pygame.init()
+        pygame.display.set_mode((1, 1), pygame.NOFRAME)  # Tiny invisible window
+
+        key_map = {
+            pygame.K_w: 'w',
+            pygame.K_a: 'a',
+            pygame.K_s: 's',
+            pygame.K_d: 'd',
+            pygame.K_q: 'q',
+            pygame.K_e: 'e',
+            pygame.K_UP: 'up',
+            pygame.K_DOWN: 'down',
+            pygame.K_SPACE: 'space',
+            pygame.K_ESCAPE: 'esc',
+            pygame.K_r: 'r',
+        }
+
+        clock = pygame.time.Clock()
+
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    self.running = False
+                elif event.type == KEYDOWN:
+                    if event.key in key_map:
+                        self.on_press(key_map[event.key])
+                elif event.type == KEYUP:
+                    if event.key in key_map:
+                        self.on_release(key_map[event.key])
+            pygame.event.pump()
+            clock.tick(60)
+
+        # Cleanup
+        pygame.quit()
         self.mover.stop()
 
 if __name__ == "__main__":
