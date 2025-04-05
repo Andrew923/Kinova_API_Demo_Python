@@ -9,9 +9,6 @@ import pygame
 from pygame.locals import *
 from connect import RobotConnect
 from arm_mover import ArmMover
-import os
-os.environ["SDL_VIDEODRIVER"] = "dummy"  # For headless operation
-os.environ["SDL_AUDIODRIVER"] = "dummy"  # Disable audio subsystem
 
 class KeyboardController:
     def __init__(self, robot_connection):
@@ -104,7 +101,8 @@ class KeyboardController:
         
         # Initialize Pygame
         pygame.init()
-        pygame.display.set_mode((1, 1), pygame.NOFRAME)  # Tiny invisible window
+        screen = pygame.display.set_mode((400, 300))
+        pygame.display.set_caption("Kinova Arm Controller")
 
         key_map = {
             pygame.K_w: 'w',
@@ -132,7 +130,7 @@ class KeyboardController:
                 elif event.type == KEYUP:
                     if event.key in key_map:
                         self.on_release(key_map[event.key])
-            pygame.event.pump()
+            
             clock.tick(60)
 
         # Cleanup
