@@ -71,19 +71,19 @@ class DataCollector:
         
         row = {
             "Time": time.time(),
-            "Gripper Pos": gripper_info.finger[0].value,
-            "Joint 0": joints.joint_angles[0].value,
-            "Joint 1": joints.joint_angles[1].value,
-            "Joint 2": joints.joint_angles[2].value,
-            "Joint 3": joints.joint_angles[3].value,
-            "Joint 4": joints.joint_angles[4].value,
-            "Joint 5": joints.joint_angles[5].value,
-            "X-Pos": end_effector.x,
-            "Y-Pos": end_effector.y,
-            "Z-Pos": end_effector.z,
-            "X-Theta": end_effector.theta_x,
-            "Y-Theta": end_effector.theta_y,
-            "Z-Theta": end_effector.theta_z,
+            "Gripper Pos": gripper_info.finger[0].value if gripper_info.finger else None,
+            "Joint 0": joints.joint_angles[0].value if joints.joint_angles else None,
+            "Joint 1": joints.joint_angles[1].value if joints.joint_angles else None,
+            "Joint 2": joints.joint_angles[2].value if joints.joint_angles else None,
+            "Joint 3": joints.joint_angles[3].value if joints.joint_angles else None,
+            "Joint 4": joints.joint_angles[4].value if joints.joint_angles else None,
+            "Joint 5": joints.joint_angles[5].value if joints.joint_angles else None,
+            "X-Pos": end_effector.x if end_effector else None,
+            "Y-Pos": end_effector.y if end_effector else None,
+            "Z-Pos": end_effector.z if end_effector else None,
+            "X-Theta": end_effector.theta_x if end_effector else None,
+            "Y-Theta": end_effector.theta_y if end_effector else None,
+            "Z-Theta": end_effector.theta_z if end_effector else None,
         }
         # print(row)
         # print(row.keys())

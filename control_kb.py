@@ -17,6 +17,8 @@ class KeyboardController:
         self.connection = robot_connection
         
         # Control parameters
+        self.linear = 2
+        self.angular = 1
         self.gripper_speed = 2   # gripper speed multiplier
         
         # Control states
@@ -47,7 +49,6 @@ class KeyboardController:
             print(f"Key press error: {e}")
 
     def on_release(self, key):
-        self.connection.push_current_info(self.mover.get_gripper_info())
         try:
             if key in ['up', 'down']:
                 self.key_states[key] = False
@@ -65,13 +66,13 @@ class KeyboardController:
             wx = (1 if self.key_states['a'] else 0) + (-1 if self.key_states['d'] else 0)
             wy = (1 if self.key_states['w'] else 0) + (-1 if self.key_states['s'] else 0)
             wz = (1 if self.key_states['q'] else 0) + (-1 if self.key_states['e'] else 0)
-            self.mover.set_cartesian_velocity(angular_x=wx, angular_y=wy, angular_z=wz)
+            self.mover.set_cartesian_velocity(angular_x=wx * self.angular, angular_y=wy * self.angular, angular_z=wz * self.angular)
         else:
             # Linear velocity mode (translation)
             vx = (1 if self.key_states['w'] else 0) + (-1 if self.key_states['s'] else 0)
             vy = (1 if self.key_states['a'] else 0) + (-1 if self.key_states['d'] else 0)
             vz = (1 if self.key_states['q'] else 0) + (-1 if self.key_states['e'] else 0)
-            self.mover.set_cartesian_velocity(linear_x=vx, linear_y=vy, linear_z=vz)
+            self.mover.set_cartesian_velocity(linear_x=vx * self.linear, linear_y=vy * self.linear, linear_z=vz * self.linear)
 
     def _update_gripper(self):
         """Update gripper based on arrow key states"""

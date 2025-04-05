@@ -20,7 +20,7 @@ class ArmMover:
             self.gripper_measure = None
         
         # Velocity control parameters
-        self.linear_velocity = 1  # m/s
+        self.linear_velocity = 0.1  # m/s
         self.angular_velocity = 30.0  # deg/s
         self.gripper_speed = 0.4
         
@@ -104,8 +104,12 @@ class ArmMover:
         
     def set_cartesian_velocity(self, linear_x=0, linear_y=0, linear_z=0,
                             angular_x=0, angular_y=0, angular_z=0):
-        print(f"Setting cartesian velocity: {linear_x}, {linear_y}, {linear_z}, "
-              f"{angular_x}, {angular_y}, {angular_z}")
+        # print(f"Setting cartesian velocity: {linear_x}, {linear_y}, {linear_z}, "
+        #       f"{angular_x}, {angular_y}, {angular_z}\n"
+        #       f"Current: {self.current_twist.twist.linear_x}, "
+        #       f"{self.current_twist.twist.linear_y}, {self.current_twist.twist.linear_z}, "
+        #       f"{self.current_twist.twist.angular_x}, {self.current_twist.twist.angular_y}, "
+        #       f"{self.current_twist.twist.angular_z}\n\n")
         """Set cartesian velocity command and mark as dirty"""
         new_linear_x = linear_x * self.linear_velocity
         new_linear_y = linear_y * self.linear_velocity

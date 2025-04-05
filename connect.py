@@ -20,7 +20,7 @@ import give_base_get_info as base_calc
 from data_collector import DataCollector
 
 class RobotConnect:
-    def __init__(self, ip, port, credentials, debug=True):
+    def __init__(self, ip, port, credentials, debug=False):
         """
         :param ip: IP Address of the robot
         :param port: TCP port (default should be 10000)

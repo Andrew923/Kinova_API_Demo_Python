@@ -18,10 +18,10 @@ class MouseController:
         self.font = pygame.font.SysFont('Arial', 20)
         
         # Control parameters
-        self.max_linear_speed = 0.2  # m/s
-        self.max_angular_speed = 0.5  # deg/s
-        self.scroll_sensitivity = 0.05  # m per scroll step
-        self.angular_scroll_sensitivity = 5.0  # deg per scroll step
+        self.max_linear_speed = 1
+        self.max_angular_speed = 1
+        self.scroll_sensitivity = 0.1
+        self.angular_scroll_sensitivity = 1.0  # deg per scroll step
         self.gripper_speed = 0.5  # Gripper speed multiplier
         
         # Control state
@@ -35,9 +35,8 @@ class MouseController:
         self.running = True
 
     def _calculate_velocity(self, start, current, max_speed):
-        """Convert drag distance to velocity vector with proper Y-axis handling"""
-        dx = current[0] - start[0]
-        dy = start[1] - current[1]  # Inverted Y-axis calculation
+        dy = start[0] - current[0]
+        dx = start[1] - current[1]
         distance = math.hypot(dx, dy)
         
         if distance == 0:
@@ -49,6 +48,9 @@ class MouseController:
 
     def control_loop(self):
         """Main control loop"""
+        # Move to initial position
+        self.mover.object_tracking_position()
+
         clock = pygame.time.Clock()
         
         while self.running:
@@ -61,6 +63,7 @@ class MouseController:
                     self.running = False
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # print(event.button)
                     if event.button == 1:  # Left click
                         self.left_dragging = True
                         self.drag_start_pos = event.pos
@@ -69,10 +72,10 @@ class MouseController:
                         self.right_dragging = True
                         self.drag_start_pos = event.pos
                         self.current_drag_pos = event.pos
-                    elif event.button == 4:  # Mouse button 4 (typically back)
+                    elif event.button == 6:
                         self.mover.move_gripper(self.gripper_speed)  # Open gripper
                         gripper = True
-                    elif event.button == 5:  # Mouse button 5 (typically forward)
+                    elif event.button == 7:
                         self.mover.move_gripper(-self.gripper_speed)  # Close gripper
                         gripper = True
                 
@@ -83,6 +86,8 @@ class MouseController:
                     elif event.button == 3:
                         self.right_dragging = False
                         self.mover.set_cartesian_velocity(angular_x=0, angular_y=0, angular_z=0)
+                    elif event.button == 6 or event.button == 7:
+                        self.mover.move_gripper(0)
                 
                 elif event.type == pygame.MOUSEMOTION:
                     if self.left_dragging or self.right_dragging:
