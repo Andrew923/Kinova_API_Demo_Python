@@ -103,7 +103,7 @@ class RobotConnect:
 
         # print("Starting Position Info:")
         # self.print_current_info()
-        self.info = DataCollector(self.base, "jsamulak")
+        self.info = DataCollector(self.base)
 
         # Specifically save the vision device, as it is going to be used for the tracking
         self.vision_config = VisionConfigClient(self.router)

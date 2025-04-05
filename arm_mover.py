@@ -35,11 +35,17 @@ class ArmMover:
         self.twist_dirty = False
         self.joint_speeds_dirty = False
         self.gripper_dirty = False
+
+        self.command_sent = False
         
         # Thread control
         self.running = True
         self.command_thread = threading.Thread(target=self._send_continuous_commands)
         self.command_thread.start()
+
+        # Data collection thread
+        self.data_thread = threading.Thread(target=self._collect_data)
+        self.data_thread.start()
 
     def get_gripper_info(self):
         return self.gripper_measure
@@ -55,6 +61,7 @@ class ArmMover:
                     else:
                         print(self.current_twist)
                     self.twist_dirty = False
+                    self.command_sent = True
                 
                 if self.joint_speeds_dirty:
                     if not self.robot_connection.debug:
@@ -62,6 +69,7 @@ class ArmMover:
                     else:
                         print(self.current_joint_speeds)
                     self.joint_speeds_dirty = False
+                    self.command_sent = True
                 
                 if self.gripper_dirty:
                     gripper_command = Base_pb2.GripperCommand()
@@ -78,6 +86,7 @@ class ArmMover:
                     else:
                         print(gripper_command)
                     self.gripper_dirty = False
+                    self.command_sent = True
                 
                 time.sleep(0.02)  # 50Hz command rate
                 
@@ -86,6 +95,15 @@ class ArmMover:
                 if not self.running:  # If we're shutting down, break the loop
                     break
                 time.sleep(0.1)  # Brief pause before retrying
+
+    def _collect_data(self):
+        while self.running:
+            if self.command_sent:  # Start collecting data only after a command has been sent
+                try:
+                    self.robot_connection.push_current_info(self.get_gripper_info())
+                except Exception as e:
+                    print(f"Error collecting data: {e}")
+            time.sleep(0.05) 
 
     def stop(self):
         """Stop all movement and clean up"""

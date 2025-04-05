@@ -9,13 +9,13 @@ from kortex_api.autogen.messages import BaseCyclic_pb2
 
 class DataCollector:
 
-    def __init__(self, base, name):
+    def __init__(self, base):
         self.base = base            # feedback base
         # self.base_cyclic = base_cyclic
         self.base_command = BaseCyclic_pb2.Command()
         # self.base_command = BaseCyclic_pb2.Command()    # this is for refreshing feedback
         # self.gripper = gripper      # feedback gripper
-        self.subject = name         # name of person's new folder to store stuff in
+        self.subject = "acyu"         # name of person's new folder to store stuff in
         self.filename = "Test 1"      # csv file name
 
         self.headers =  ["Time", "Gripper Pos",

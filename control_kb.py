@@ -14,7 +14,6 @@ class KeyboardController:
     def __init__(self, robot_connection):
         self.mover = ArmMover(robot_connection)
         self.running = True
-        self.connection = robot_connection
         
         # Control parameters
         self.linear = 2
