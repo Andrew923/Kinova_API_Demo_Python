@@ -10,6 +10,8 @@
 - Connect ethernet cable
 - Go to ethernet settings -> IP assignment -> Manually set IPv4 to 192.168.2.11 and Subnet mask to 255.255.255.0
 - Test out if it works by going to the robots ip address (Blue is 192.168.2.9, Green is 192.168.2.10)
+  - If the website loads at all, you're good
+- Run control_kb.py 
 
 # Resources
 - Notes: https://docs.google.com/document/d/1zoFW4ZuOTBR4lSNPiNPy8yPemmfg1WP5qOGI7yzQbJ0/edit?tab=t.0

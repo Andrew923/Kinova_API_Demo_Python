@@ -10,6 +10,11 @@ from kortex_api.autogen.messages import Base_pb2, Common_pb2
 class ArmMover:
     def __init__(self, robot_connection):
         self.robot_connection = robot_connection
+
+        # Gripper info
+        self.gripper_request = Base_pb2.GripperRequest()
+        self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
+        self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
         
         # Velocity control parameters
         self.linear_velocity = 1  # m/s
@@ -33,19 +38,22 @@ class ArmMover:
         self.command_thread = threading.Thread(target=self._send_continuous_commands)
         self.command_thread.start()
 
+    def get_gripper_info(self):
+        return self.gripper_measure
+
     def _send_continuous_commands(self):
         """Thread that efficiently sends only changed commands"""
         while self.running:
             try:
                 # Only send commands that have changed
                 if self.twist_dirty:
-                    # print(self.current_twist)
-                    self.robot_connection.base.SendTwistCommand(self.current_twist)
+                    print(self.current_twist)
+                    # self.robot_connection.base.SendTwistCommand(self.current_twist)
                     self.twist_dirty = False
                 
                 if self.joint_speeds_dirty:
-                    # print(self.current_joint_speeds)
-                    self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
+                    print(self.current_joint_speeds)
+                    # self.robot_connection.base.SendJointSpeedsCommand(self.current_joint_speeds)
                     self.joint_speeds_dirty = False
                 
                 if self.gripper_dirty:
@@ -53,7 +61,13 @@ class ArmMover:
                     finger = gripper_command.gripper.finger.add()
                     gripper_command.mode = Base_pb2.GRIPPER_SPEED
                     finger.value = self.current_gripper_speed
-                    self.robot_connection.base.SendGripperCommand(gripper_command)
+
+                    self.gripper_request = Base_pb2.GripperRequest()
+                    self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
+                    self.gripper_measure = self.robot_connection.base.GetMeasuredGripperMovement(self.gripper_request)
+
+                    print(gripper_command)
+                    # self.robot_connection.base.SendGripperCommand(gripper_command)
                     self.gripper_dirty = False
                 
                 time.sleep(0.02)  # 50Hz command rate

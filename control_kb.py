@@ -15,6 +15,7 @@ class KeyboardController:
     def __init__(self, robot_connection):
         self.mover = ArmMover(robot_connection)
         self.running = True
+        self.connection = robot_connection
         
         # Control parameters
         self.gripper_speed = 2   # gripper speed multiplier
@@ -48,6 +49,7 @@ class KeyboardController:
             print(f"Key press error: {e}")
 
     def on_release(self, key):
+        self.connection.push_current_info(self.mover.get_gripper_info())
         try:
             if key in ['up', 'down']:
                 self.key_states[key] = False
